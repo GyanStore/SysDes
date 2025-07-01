@@ -1,0 +1,84 @@
+class LoadBalancer:
+    def __init__(self, servers):
+        """
+        Initialize the load balancer with a list of servers.
+        Each server can be a string (for simple Round Robin or IP Hashing)
+        or a tuple (server, weight) for Weighted Round Robin.
+        """
+        self.servers = servers
+        self.current_index = 0
+        self.weighted_servers = self._prepare_weighted_servers()
+
+    def _prepare_weighted_servers(self):
+        """
+        Prepare a list for weighted round robin by expanding servers based on their weights.
+        For example, a server with weight 3 will appear 3 times in the list.
+        """
+        weighted = []
+        for server in self.servers:
+            if isinstance(server, tuple):
+                server_name, weight = server
+                weighted.extend([server_name] * weight)
+            else:
+                weighted.append(server)
+        return weighted
+
+    def round_robin(self):
+        """
+        Implements Round Robin load balancing.
+        Returns the next server in a cyclic order.
+        """
+        server = self.servers[self.current_index]
+        self.current_index = (self.current_index + 1) % len(self.servers)
+        return server
+
+    def weighted_round_robin(self):
+        """
+        Implements Weighted Round Robin load balancing.
+        Servers with higher weights get selected more frequently.
+        """
+        if not self.weighted_servers:
+            return None
+        server = self.weighted_servers[self.current_index]
+        self.current_index = (self.current_index + 1) % len(self.weighted_servers)
+        return server
+
+    def ip_hash(self, client_ip):
+        """
+        Implements IP Hashing load balancing.
+        Maps a client IP to a server based on a hash function.
+        """
+        if not isinstance(client_ip, str):
+            client_ip = str(client_ip)
+        hash_value = sum(ord(c) for c in client_ip) % len(self.servers)
+        return self.servers[hash_value]
+
+    def get_servers(self):
+        """Returns the list of servers."""
+        return self.servers
+
+
+# Example usage
+if __name__ == "__main__":
+    # Example with simple servers for Round Robin and IP Hashing
+    servers = ["Server1", "Server2", "Server3"]
+    lb = LoadBalancer(servers)
+
+    # Round Robin example
+    print("Round Robin:")
+    for _ in range(6):
+        print(lb.round_robin())
+
+    # IP Hashing example
+    print("\nIP Hashing:")
+    print(f"Client 192.168.1.1 -> {lb.ip_hash('192.168.1.1')}")
+    print(f"Client 192.168.1.2 -> {lb.ip_hash('192.168.1.2')}")
+    print(f"Client 192.168.1.1 -> {lb.ip_hash('192.168.1.1')}")  # Same IP, same server
+
+    # Example with weighted servers for Weighted Round Robin
+    weighted_servers = [("Server1", 3), ("Server2", 2), ("Server3", 1)]
+    lb_weighted = LoadBalancer(weighted_servers)
+
+    print("\nWeighted Round Robin:")
+    for _ in range(6):
+        print(lb_weighted.weighted_round_robin())
