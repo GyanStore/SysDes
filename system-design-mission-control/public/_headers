@@ -1,0 +1,10 @@
+# Production HTTP security headers (Netlify / Cloudflare Pages format).
+# For other hosts (Nginx, S3+CloudFront, Vercel), replicate these as response
+# headers. See SECURITY.md. Deploy CSP in Report-Only first, then enforce.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains

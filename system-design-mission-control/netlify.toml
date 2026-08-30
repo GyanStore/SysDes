@@ -1,0 +1,14 @@
+# Netlify build settings — makes Git-connected deploys "just work".
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# App uses HashRouter (no server routing needed), but this SPA fallback is a
+# harmless safety net so any path still serves the app instead of a 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

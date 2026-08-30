@@ -1,0 +1,383 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Mission Control — design tokens
+   One place to re-theme the whole instrument panel.
+   ============================================================ */
+:root {
+  --bg: #060a16;
+  --bg-glow: #0d1a3a;
+  --panel: #0f1830;
+  --panel2: #0b1226;
+  --ink: #e9eeff;
+  --muted: #8fa0cc;
+  --line: #22315c;
+  --accent: #5eb0ff; /* primary cyan-blue */
+  --accent2: #6bf0c8; /* mint / nominal glow */
+  --ok: #57e389; /* green — nominal */
+  --warn: #ffcf6e; /* amber — caution */
+  --danger: #ff6b8b; /* red — alarm */
+  --violet: #b79bff;
+
+  --radius: 14px;
+  --mono: "SF Mono", ui-monospace, Menlo, Consolas, "Roboto Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(1200px 720px at 78% -10%, var(--bg-glow) 0, transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, #10143000 0, transparent 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* subtle instrument grid backdrop (faint HUD over the starfield) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(94, 176, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94, 176, 255, 0.02) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(circle at 50% 30%, #000 0, transparent 80%);
+  z-index: 1;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 640;
+  letter-spacing: 0.2px;
+}
+
+::selection {
+  background: rgba(94, 176, 255, 0.3);
+}
+
+/* focus visibility for keyboard users (a11y) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1b2748;
+  border-radius: 20px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #26355f;
+  background-clip: content-box;
+}
+
+@layer components {
+  .panel {
+    background: linear-gradient(180deg, var(--panel), var(--panel2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent2);
+    border: 1px solid var(--line);
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(11, 18, 38, 0.6);
+    white-space: nowrap;
+  }
+  .readout {
+    font-family: var(--mono);
+    color: var(--accent2);
+    font-variant-numeric: tabular-nums;
+  }
+  .btn {
+    border-radius: 11px;
+    padding: 9px 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 0.1s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
+    border: 1px solid var(--line);
+    background: rgba(10, 17, 40, 0.7);
+    color: var(--ink);
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .btn-primary {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    color: #051225;
+    border: none;
+    font-weight: 800;
+    box-shadow: 0 6px 22px rgba(94, 176, 255, 0.28);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.05);
+  }
+  .grad-text {
+    background: linear-gradient(90deg, #9cc7ff, var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Entrance reveal — animates ONLY the slide, never opacity, so content is
+   always visible even if the animation never runs (hidden/background tab,
+   reduced motion). A subtle rise is a nicety, not a visibility gate. */
+@keyframes revealUp {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: none;
+  }
+}
+.reveal {
+  animation: revealUp 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0.35; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-in {
+  animation: fadeIn 0.28s ease-out both;
+}
+
+/* ============================================================
+   Space background scene
+   ============================================================ */
+.space-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.nebula-1 {
+  width: 60vw;
+  height: 60vw;
+  top: -18vw;
+  right: -12vw;
+  background: radial-gradient(circle, rgba(94, 130, 255, 0.28), transparent 62%);
+  animation: nebulaDrift 34s ease-in-out infinite alternate;
+}
+.nebula-2 {
+  width: 55vw;
+  height: 55vw;
+  bottom: -20vw;
+  left: -14vw;
+  background: radial-gradient(circle, rgba(183, 155, 255, 0.24), transparent 62%);
+  animation: nebulaDrift 42s ease-in-out infinite alternate-reverse;
+}
+.nebula-3 {
+  width: 46vw;
+  height: 46vw;
+  top: 32%;
+  left: 30%;
+  background: radial-gradient(circle, rgba(94, 234, 212, 0.14), transparent 60%);
+  animation: nebulaDrift 50s ease-in-out infinite alternate;
+}
+@keyframes nebulaDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.12); }
+}
+
+.stars-wrap { position: absolute; inset: 0; }
+.stars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background: transparent;
+  will-change: transform;
+}
+.stars-far { animation: starDrift 140s linear infinite; opacity: 0.7; }
+.stars-mid { animation: starDrift 90s linear infinite; opacity: 0.85; }
+.stars-near { animation: starDrift 60s linear infinite; }
+@keyframes starDrift {
+  from { transform: translateY(0); }
+  to { transform: translateY(-40px); }
+}
+
+.twinkle {
+  position: absolute;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.7);
+  animation-name: twinkle;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.drift-galaxy {
+  position: absolute;
+  opacity: 0.55;
+  animation: galaxyFloat 26s ease-in-out infinite alternate;
+}
+.drift-galaxy--slow { animation-duration: 38s; }
+@keyframes galaxyFloat {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-2%, -3%, 0); }
+}
+.gx-spin { animation: gxSpin 120s linear infinite; transform-origin: 50% 50%; }
+@keyframes gxSpin {
+  to { transform: rotate(360deg); }
+}
+
+.shooting-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.8);
+}
+.shooting-star::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 120px;
+  height: 1px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), transparent);
+}
+.ss-1 { top: 12%; left: 70%; animation: shoot 9s ease-in 3s infinite; }
+.ss-2 { top: 40%; left: 88%; animation: shoot 13s ease-in 8s infinite; }
+@keyframes shoot {
+  0% { opacity: 0; transform: translate(0, 0) rotate(18deg); }
+  4% { opacity: 1; }
+  16% { opacity: 1; transform: translate(-420px, 160px) rotate(18deg); }
+  17%, 100% { opacity: 0; transform: translate(-420px, 160px) rotate(18deg); }
+}
+
+/* ============================================================
+   Voyage route (Mission Map)
+   ============================================================ */
+.voyage {
+  position: relative;
+}
+.voyage-spine {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 35px;
+  width: 2px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(94, 176, 255, 0.55) 0 8px,
+      transparent 8px 18px
+    );
+  background-size: 100% 36px;
+  animation: routeFlow 1.6s linear infinite;
+  box-shadow: 0 0 10px rgba(94, 176, 255, 0.35);
+}
+@keyframes routeFlow {
+  to { background-position: 0 36px; }
+}
+.comet {
+  position: absolute;
+  left: 32px;
+  width: 8px;
+  height: 8px;
+  margin-left: 0;
+  border-radius: 50%;
+  background: #bfe0ff;
+  box-shadow: 0 0 12px 3px rgba(140, 200, 255, 0.8);
+  animation: cometTravel linear infinite;
+}
+.comet::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 46px;
+  background: linear-gradient(180deg, transparent, rgba(140, 200, 255, 0.7));
+}
+@keyframes cometTravel {
+  0% { top: -3%; opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { top: 103%; opacity: 0; }
+}
+@media (max-width: 640px) {
+  .voyage-spine { left: 23px; }
+  .comet { left: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nebula, .stars, .twinkle, .drift-galaxy, .gx-spin, .shooting-star,
+  .voyage-spine, .comet {
+    animation: none !important;
+  }
+}
+
+/* Respect users who prefer less motion — instruments fall back to static. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

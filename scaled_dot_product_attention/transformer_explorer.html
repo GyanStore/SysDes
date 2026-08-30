@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Local educational tool. User-typed text is always rendered with
+     textContent / DOM APIs (never innerHTML), so a typed sentence is shown
+     literally and never executed. CSP hardens the page further. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Transformer Architecture Explorer</title>
+<style>
+  :root{
+    --bg:#0a0f1f; --panel:#111a33; --panel2:#0d1430; --ink:#e9eeff; --muted:#8f9dc7;
+    --line:#243358; --accent:#6ea8fe; --accent2:#7ef0c8; --hot:#ff7ca8; --warm:#ffcf6e;
+    --q:#6ea8fe; --k:#7ef0c8; --v:#ffcf6e; --pos:#c79bff; --emb:#ff9ec4;
+    --radius:14px; --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:radial-gradient(1200px 800px at 75% -12%,#17224a 0,var(--bg) 55%);
+    color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+  h1,h2,h3{margin:0;font-weight:650;letter-spacing:.2px}
+  .wrap{max-width:1340px;margin:0 auto;padding:20px 18px 90px}
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .badge{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--accent2);
+    border:1px solid var(--line);padding:3px 9px;border-radius:999px;background:#0e1836}
+  header.top h1{font-size:24px;background:linear-gradient(90deg,#9cc2ff,#7ef0c8);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  header.top p{margin:0;color:var(--muted);font-size:13px;flex-basis:100%}
+
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .controls{margin-bottom:16px}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  input[type=text]{background:#0a1130;border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:11px 13px;font-size:15px;font-family:var(--sans);min-width:360px}
+  input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #6ea8fe33}
+  select{background:#0a1130;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 11px;font-family:var(--sans)}
+  input[type=range]{accent-color:var(--accent);width:130px}
+  .rangeval{font-family:var(--mono);color:var(--accent2);font-size:12px}
+  button.go{background:linear-gradient(90deg,#6ea8fe,#7ef0c8);color:#06122a;border:none;
+    font-weight:800;letter-spacing:.3px;padding:12px 20px;border-radius:11px;cursor:pointer;
+    font-size:14px;box-shadow:0 6px 20px #6ea8fe33;transition:transform .1s}
+  button.go:hover{transform:translateY(-1px)}
+  button.ghost{background:#0a1130;border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:11px 16px;cursor:pointer;font-weight:600}
+  button.ghost:hover{border-color:var(--accent)}
+  .chip{background:#0a1130;border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--muted);font-size:13px}
+  .chip:hover{border-color:var(--accent);color:var(--ink)}
+  .chip.sel{border-color:var(--accent2);color:var(--ink);background:#12224a}
+  .hint{color:var(--muted);font-size:12px}
+  kbd{font-family:var(--mono);background:#0a1130;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:6px;padding:1px 6px;font-size:11px}
+
+  /* ===== main split ===== */
+  .stage{display:grid;grid-template-columns:minmax(360px,520px) 1fr;gap:18px;align-items:start}
+  @media(max-width:1040px){.stage{grid-template-columns:1fr}input[type=text]{min-width:0;width:100%}}
+
+  /* ===== architecture column ===== */
+  .arch{display:flex;flex-direction:column;align-items:center;gap:0}
+  .conn{width:3px;height:26px;position:relative;background:
+    repeating-linear-gradient(180deg,var(--line) 0 5px,transparent 5px 10px)}
+  .conn .spark{position:absolute;left:50%;top:0;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;
+    background:var(--accent2);box-shadow:0 0 10px 2px var(--accent2);opacity:0;}
+  .flowing .conn .spark{animation:travel 1.5s linear infinite}
+  @keyframes travel{0%{top:-4px;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:26px;opacity:0}}
+
+  .block{width:100%;max-width:460px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    background:linear-gradient(180deg,#131d3d,#0f1733);cursor:pointer;transition:.15s;position:relative}
+  .block:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .block.sel{border-color:var(--accent2);box-shadow:0 0 0 2px #7ef0c855,0 10px 30px #0006}
+  .block .btitle{display:flex;align-items:center;gap:9px;font-weight:650;font-size:14px}
+  .block .tag{margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+    font-family:var(--mono)}
+  .block .bsub{color:var(--muted);font-size:12px;margin-top:2px}
+  .ico{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:800;color:#06122a}
+  .ico.att{background:linear-gradient(135deg,#6ea8fe,#7ef0c8)}
+  .ico.norm{background:linear-gradient(135deg,#ffcf6e,#ff9ec4)}
+  .ico.ffn{background:linear-gradient(135deg,#7ef0c8,#c79bff)}
+  .ico.emb{background:linear-gradient(135deg,#ff9ec4,#c79bff)}
+  .ico.pos{background:linear-gradient(135deg,#c79bff,#6ea8fe)}
+  .ico.io{background:linear-gradient(135deg,#8f9dc7,#e9eeff)}
+
+  .layerbox{width:100%;max-width:474px;border:1px dashed #33457a;border-radius:16px;padding:12px 8px;
+    margin:0;background:#0c142e88;position:relative}
+  .layerbox>.ll{position:absolute;top:-10px;left:14px;background:var(--bg);padding:0 8px;font-size:11px;
+    letter-spacing:1px;text-transform:uppercase;color:var(--accent);font-family:var(--mono)}
+  .layerbox .arch{gap:0}
+
+  /* token strip inside a block: mini per-token vector preview of selected token */
+  .stripmini{display:flex;gap:2px;margin-top:8px;height:16px;align-items:stretch}
+  .stripmini i{flex:1;border-radius:2px}
+
+  /* token pills row */
+  .tokrow{display:flex;flex-wrap:wrap;gap:6px}
+  .tokpill{background:#0a1130;border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;
+    font-size:13px;display:flex;gap:6px;align-items:center;transition:.12s}
+  .tokpill:hover{border-color:var(--accent)}
+  .tokpill.sel{border-color:var(--accent2);background:#12224a;box-shadow:0 0 0 2px #7ef0c833}
+  .tokpill .ix{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+  /* ===== inspector ===== */
+  #inspector{position:sticky;top:12px}
+  .card-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .card-title h2{font-size:15px}
+  .sub{color:var(--muted);font-size:12px;margin-left:auto}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  .desc{color:#cdd6f5;font-size:13px;background:#0a1130;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .formula{font-family:var(--mono);font-size:12.5px;color:var(--accent2);background:#0a1130;border:1px solid var(--line);
+    border-radius:10px;padding:11px 13px;margin-top:10px;white-space:pre-wrap;line-height:1.7}
+  .formula .dim{color:var(--muted)}
+
+  /* vector bars */
+  .veclabel{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;min-width:120px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;align-items:center;margin-top:6px}
+  .vec{display:flex;gap:3px;align-items:center;height:38px}
+  .bar{width:11px;border-radius:3px;position:relative}
+  .bar.q{background:linear-gradient(180deg,#6ea8fe,#3b6fd6)}
+  .bar.k{background:linear-gradient(180deg,#7ef0c8,#3fbf98)}
+  .bar.v{background:linear-gradient(180deg,#ffcf6e,#d99f2f)}
+  .bar.n{background:linear-gradient(180deg,#c79bff,#7d5bd6)}
+  .bar.neg{opacity:.5}
+
+  /* value-evolution heatmap */
+  .evo{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0a1130}
+  table.evo-t{border-collapse:separate;border-spacing:0;font-family:var(--mono);font-size:11px;width:100%}
+  table.evo-t th{position:sticky;left:0;background:#0a1130;color:var(--muted);text-align:right;
+    padding:0 10px;white-space:nowrap;font-weight:600;z-index:2}
+  table.evo-t thead th{position:sticky;top:0;text-align:center;padding:6px 4px;color:var(--muted);z-index:3}
+  table.evo-t td{width:26px;height:24px;text-align:center;cursor:pointer;color:#08122b;font-weight:700}
+  table.evo-t td:hover{outline:2px solid #fff}
+  table.evo-t tr.stagesel th{color:var(--accent2)}
+
+  /* attention matrix + flow for MHA detail */
+  .att-wrap{display:grid;grid-template-columns:1fr;gap:14px}
+  svg.flow{width:100%;display:block;background:#0a1130;border:1px solid var(--line);border-radius:10px}
+  .tok text{font-family:var(--sans);font-size:12px;fill:var(--ink)}
+  .tok rect{fill:#101a3a;stroke:var(--line)}
+  .tok:hover rect,.tok.sel rect{stroke:var(--accent2)}
+  .tok{cursor:pointer}
+  .colcap{fill:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase}
+  path.edge{fill:none;stroke:var(--accent);stroke-linecap:round}
+  path.edge.anim{stroke-dasharray:2 7;animation:dash 1.1s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-90}}
+  .pulse{fill:var(--accent2)}
+  .matrix{border-collapse:separate;border-spacing:3px;font-family:var(--mono);font-size:11px}
+  .matrix td{width:28px;height:24px;text-align:center;border-radius:5px;color:#08122b;font-weight:700;cursor:pointer}
+  .matrix td:hover{outline:2px solid #fff}
+  .matrix th{color:var(--muted);font-weight:600;font-size:10px;max-width:52px;overflow:hidden;text-overflow:ellipsis}
+  .softrow{display:grid;grid-template-columns:64px 1fr 46px;gap:8px;align-items:center;margin:3px 0}
+  .softrow .tk{font-size:12px;color:var(--muted);text-align:right;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .softbar{height:15px;border-radius:5px;background:linear-gradient(90deg,#6ea8fe,#7ef0c8);transition:width .5s}
+  .softval{font-family:var(--mono);font-size:12px;color:var(--accent2);text-align:right}
+  .tabs{display:flex;gap:6px;margin:12px 0 2px;flex-wrap:wrap}
+  .tabs button{background:#0a1130;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12.5px}
+  .tabs button.on{color:var(--ink);border-color:var(--accent);background:#16224a}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+  .empty{color:var(--muted);font-style:italic;padding:16px 0;text-align:center}
+  footer{color:var(--muted);font-size:12px;margin-top:26px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="badge">Foundation Models</span>
+    <h1>Transformer Architecture Explorer</h1>
+    <p>Every component of the Transformer, running a real forward pass on your sentence. Pick a token and
+       watch its vector actually change at each step. Click any block to open it; the
+       <b style="color:var(--accent2)">Multi-Head Attention</b> block reveals the full Q·K·V machinery.</p>
+  </header>
+
+  <!-- CONTROLS -->
+  <div class="panel controls">
+    <div class="row">
+      <div class="field" style="flex:1;min-width:260px">
+        <label for="sentence">Sentence</label>
+        <input type="text" id="sentence" value="the cat sat on the mat" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field"><label for="layers">Layers (N×)</label>
+        <select id="layers"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <div class="field"><label for="heads">Heads</label>
+        <select id="heads"><option>1</option><option selected>2</option><option>4</option></select></div>
+      <div class="field"><label for="atype">Attention</label>
+        <select id="atype">
+          <option value="self">Self (bidirectional)</option>
+          <option value="causal">Causal (GPT)</option>
+          <option value="window">Sliding window</option>
+        </select></div>
+      <div class="field"><label for="win">Window <span class="rangeval" id="winval">3</span></label>
+        <input type="range" id="win" min="1" max="8" value="3" step="1"></div>
+      <div class="field"><label for="temp">Softmax temp <span class="rangeval" id="tempval">1.0</span></label>
+        <input type="range" id="temp" min="0.3" max="3" value="1" step="0.1"></div>
+      <button class="go" id="run">▶ Run forward pass</button>
+      <button class="ghost" id="animBtn">✦ Animate flow</button>
+    </div>
+    <div class="row" style="margin-top:12px;gap:8px;align-items:center">
+      <span class="hint">Trace token:</span>
+      <div class="tokrow" id="tokrow" style="flex:1"></div>
+    </div>
+    <div class="row" style="margin-top:8px;gap:8px">
+      <span class="chip" data-ex="the cat sat on the mat">the cat sat on the mat</span>
+      <span class="chip" data-ex="the animal did not cross the street because it was tired">long-range “it”</span>
+      <span class="chip" data-ex="the bank by the river was steep">ambiguous “bank”</span>
+      <span class="hint" style="margin-left:auto">💡 <kbd>click</kbd> a block · pick a <kbd>token</kbd> · open <kbd>Multi-Head Attention</kbd> for Q/K/V</span>
+    </div>
+  </div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <!-- ARCHITECTURE -->
+    <div class="panel">
+      <div class="card-title"><span class="dot"></span><h2>Architecture</h2>
+        <span class="sub">data flows top → bottom</span></div>
+      <div class="arch" id="arch"></div>
+    </div>
+
+    <!-- INSPECTOR -->
+    <div class="panel" id="inspector">
+      <div class="card-title"><span class="dot" style="background:var(--warm)"></span>
+        <h2 id="inspTitle">Inspector</h2><span class="sub" id="inspSub"></span></div>
+      <div id="inspBody"><div class="empty">Click a component on the left to open it.</div></div>
+    </div>
+  </div>
+
+  <footer>All numbers are really computed in your browser: token embeddings + sinusoidal positions, per-head
+    Q/K/V, scaled dot-product attention, residual + LayerNorm, and a feed-forward network — for as many layers
+    as you choose. Deterministic per word, so results are reproducible.</footer>
+</div>
+
+<script>
+"use strict";
+/* =======================================================================
+   Deterministic mini-Transformer.  Real forward pass, small dims so every
+   vector is legible.  d_model = 8, d_ff = 16.
+   ======================================================================= */
+const D=8, DFF=16, EPS=1e-5;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function randn(rng){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*v);}
+function vecRand(seed,n){const r=mulberry32(seed>>>0);const a=[];for(let i=0;i<n;i++)a.push(randn(r)*0.9);return a;}
+function matRand(seed,out,inn){const r=mulberry32(seed>>>0);const m=[];for(let o=0;o<out;o++){const row=[];
+  for(let c=0;c<inn;c++)row.push(randn(r)*(1/Math.sqrt(inn)));m.push(row);}return m;}
+function matVec(M,v){return M.map(row=>{let s=0;for(let i=0;i<v.length;i++)s+=row[i]*v[i];return s;});} // out[o]=Σ W[o][i] x[i]
+function add(a,b){return a.map((x,i)=>x+b[i]);}
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;}
+function relu(v){return v.map(x=>Math.max(0,x));}
+function layerNorm(v){const m=v.reduce((a,b)=>a+b,0)/v.length;
+  const varr=v.reduce((a,b)=>a+(b-m)*(b-m),0)/v.length;const s=Math.sqrt(varr+EPS);return v.map(x=>(x-m)/s);}
+function posEnc(pos,d){const v=[];for(let i=0;i<d;i++){const k=Math.floor(i/2);const den=Math.pow(10000,2*k/d);
+  v.push(i%2===0?Math.sin(pos/den):Math.cos(pos/den));}return v;}
+function softmax(arr,temp){const t=temp||1;const f=arr.filter(x=>x>-Infinity);const m=f.length?Math.max(...f):0;
+  const e=arr.map(x=>x===-Infinity?0:Math.exp((x-m)/t));const s=e.reduce((a,b)=>a+b,0)||1;return e.map(x=>x/s);}
+
+/* fixed weight banks (per layer derived from seed) */
+function layerWeights(l){
+  return {
+    WQ:matRand(1000+l*10+1,D,D), WK:matRand(1000+l*10+2,D,D), WV:matRand(1000+l*10+3,D,D),
+    WO:matRand(1000+l*10+4,D,D),
+    W1:matRand(1000+l*10+5,DFF,D), b1:vecRand(1000+l*10+6,DFF).map(x=>x*0.3),
+    W2:matRand(1000+l*10+7,D,DFF), b2:vecRand(1000+l*10+8,D).map(x=>x*0.3),
+  };
+}
+
+let MODEL=null;
+function tokenize(s){return s.trim().split(/\s+/).filter(Boolean).slice(0,10);}
+
+function forward(cfg){
+  const toks=tokenize(cfg.sentence); const n=toks.length;
+  const heads=cfg.heads, dHead=D/heads;
+  const emb=toks.map(t=>vecRand(hashStr(t.toLowerCase())||1,D));
+  const pe=toks.map((t,i)=>posEnc(i,D));
+  const x0=emb.map((e,i)=>add(e,pe[i]));
+
+  const SNAP={};   // stage key -> {label, vectors:[n][D]}
+  const snap=(key,label,vectors)=>{SNAP[key]={label,vectors:vectors.map(v=>v.slice())};};
+  snap("embedding","Embedding",emb);
+  snap("positional","Embed + Position",x0);
+
+  const LAYERS=[];
+  let x=x0.map(v=>v.slice());
+  for(let l=0;l<cfg.layers;l++){
+    const W=layerWeights(l);
+    // ---- multi-head self-attention ----
+    const Qf=x.map(v=>matVec(W.WQ,v)), Kf=x.map(v=>matVec(W.WK,v)), Vf=x.map(v=>matVec(W.WV,v));
+    const perHead=[]; const concat=Array.from({length:n},()=>new Array(D).fill(0));
+    for(let hh=0;hh<heads;hh++){
+      const lo=hh*dHead, hi=lo+dHead;
+      const Q=Qf.map(v=>v.slice(lo,hi)),K=Kf.map(v=>v.slice(lo,hi)),V=Vf.map(v=>v.slice(lo,hi));
+      const scores=[],masked=[],weights=[],out=[];
+      for(let i=0;i<n;i++){
+        const rs=[],rm=[];
+        for(let j=0;j<n;j++){
+          const sc=dot(Q[i],K[j])/Math.sqrt(dHead); rs.push(sc);
+          let ok=true;
+          if(cfg.atype==="causal")ok=j<=i; else if(cfg.atype==="window")ok=Math.abs(i-j)<=cfg.win;
+          rm.push(ok?sc:-Infinity);
+        }
+        const w=softmax(rm,cfg.temp); const o=new Array(dHead).fill(0);
+        for(let j=0;j<n;j++)for(let d=0;d<dHead;d++)o[d]+=w[j]*V[j][d];
+        scores.push(rs);masked.push(rm);weights.push(w);out.push(o);
+        for(let d=0;d<dHead;d++)concat[i][lo+d]=o[d];
+      }
+      perHead.push({Q,K,V,scores,masked,weights,out,dHead,lo,hi});
+    }
+    const attnOut=concat.map(v=>matVec(W.WO,v));
+    snap("attn"+l,"Attention out (layer "+(l+1)+")",attnOut);
+    // ---- add & norm 1 ----
+    const res1=x.map((v,i)=>add(v,attnOut[i]));
+    const h1=res1.map(layerNorm);
+    snap("an1_"+l,"After Add&Norm 1 (layer "+(l+1)+")",h1);
+    // ---- feed forward ----
+    const ff=h1.map(v=>add(matVec(W.W2,relu(add(matVec(W.W1,v),W.b1))),W.b2));
+    snap("ffn"+l,"FFN out (layer "+(l+1)+")",ff);
+    // ---- add & norm 2 ----
+    const res2=h1.map((v,i)=>add(v,ff[i]));
+    const h2=res2.map(layerNorm);
+    snap("an2_"+l,"After Add&Norm 2 (layer "+(l+1)+")",h2);
+
+    LAYERS.push({perHead,concat,attnOut,res1,h1,ff,res2,h2,heads,dHead});
+    x=h2.map(v=>v.slice());
+  }
+  snap("output","Final output",x);
+  return {cfg,toks,n,heads,dHead,emb,pe,x0,SNAP,LAYERS,
+    stageOrder:buildStageOrder(cfg.layers)};
+}
+function buildStageOrder(L){
+  const o=["embedding","positional"];
+  for(let l=0;l<L;l++)o.push("attn"+l,"an1_"+l,"ffn"+l,"an2_"+l);
+  o.push("output");return o;
+}
+
+/* =======================================================================
+   DOM helpers (user text only via textContent)
+   ======================================================================= */
+const $=id=>document.getElementById(id);
+const SVGNS="http://www.w3.org/2000/svg";
+function h(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function svgel(tag,a,text){const e=document.createElementNS(SVGNS,tag);if(a)for(const k in a)e.setAttribute(k,a[k]);
+  if(text!=null)e.textContent=text;return e;}
+
+function divColor(v,scale){ // diverging: neg=blue, 0=dark, pos=warm/pink
+  const t=Math.max(-1,Math.min(1,v/(scale||1)));
+  if(t>=0){const f=t;const r=Math.round(18+f*(255-18)),g=Math.round(26+f*(159-26)),b=Math.round(52+f*(196-52));
+    return `rgb(${r},${g},${b})`;} // -> warm pink #ff9fc4-ish
+  const f=-t;const r=Math.round(18+f*(110-18)),g=Math.round(26+f*(168-26)),b=Math.round(52+f*(254-52));
+  return `rgb(${r},${g},${b})`;} // -> blue
+function heatColor(w){const c1=[16,26,58],c2=[110,168,254],c3=[126,240,200];const t=Math.min(1,Math.max(0,w));
+  let a,b,f;if(t<0.5){a=c1;b=c2;f=t/0.5;}else{a=c2;b=c3;f=(t-0.5)/0.5;}
+  return `rgb(${Math.round(a[0]+(b[0]-a[0])*f)},${Math.round(a[1]+(b[1]-a[1])*f)},${Math.round(a[2]+(b[2]-a[2])*f)})`;}
+
+function vecBars(vec,cls){const wrap=h("div","vec");const max=Math.max(0.001,...vec.map(v=>Math.abs(v)));
+  vec.forEach(v=>{const b=h("div","bar "+cls+(v<0?" neg":""));b.style.height=(5+Math.abs(v)/max*30)+"px";
+    b.title=v.toFixed(3);wrap.appendChild(b);});return wrap;}
+function stageStrip(vec){const s=h("div","stripmini");const max=Math.max(0.001,...vec.map(v=>Math.abs(v)));
+  vec.forEach(v=>{const i=h("i");i.style.background=divColor(v,max);i.title=v.toFixed(3);s.appendChild(i);});return s;}
+
+/* =======================================================================
+   ARCHITECTURE COLUMN
+   ======================================================================= */
+let SELBLOCK=null, SELTOK=0;
+function conn(){const c=h("div","conn");c.appendChild(h("div","spark"));return c;}
+
+function renderArch(){
+  const M=MODEL, root=$("arch");root.replaceChildren();
+  const tokVec=key=>M.SNAP[key]?M.SNAP[key].vectors[SELTOK]:null;
+
+  const mkBlock=(o)=>{
+    const b=h("div","block"+(SELBLOCK===o.id?" sel":""));
+    const t=h("div","btitle");
+    const ic=h("div","ico "+o.icon);ic.textContent=o.iconTxt;t.appendChild(ic);
+    t.appendChild(h("span",null,o.title));
+    if(o.tag){const tg=h("span","tag",o.tag);t.appendChild(tg);}
+    b.appendChild(t);
+    if(o.sub)b.appendChild(h("div","bsub",o.sub));
+    if(o.stage&&tokVec(o.stage))b.appendChild(stageStrip(tokVec(o.stage)));
+    b.addEventListener("click",()=>{SELBLOCK=o.id;selectComponent(o);renderArch();});
+    return b;
+  };
+
+  // input tokens block (special)
+  const tb=h("div","block"+(SELBLOCK==="tokens"?" sel":""));
+  const tt=h("div","btitle");const tic=h("div","ico io");tic.textContent="in";tt.appendChild(tic);
+  tt.appendChild(h("span",null,"Input Tokens"));tt.appendChild(h("span","tag","n="+M.n));tb.appendChild(tt);
+  const tr=h("div","tokrow");tr.style.marginTop="8px";
+  M.toks.forEach((tk,i)=>{const p=h("div","tokpill"+(i===SELTOK?" sel":""));
+    p.appendChild(document.createTextNode(tk));const ix=h("span","ix","#"+i);p.appendChild(ix);
+    p.addEventListener("click",e=>{e.stopPropagation();SELTOK=i;syncTokRow();refreshAll();});tr.appendChild(p);});
+  tb.appendChild(tr);
+  tb.addEventListener("click",()=>{SELBLOCK="tokens";selectComponent({id:"tokens",kind:"tokens",title:"Input Tokens"});renderArch();});
+  root.appendChild(tb);
+
+  const seq=[
+    {id:"embed",title:"Token Embedding",sub:"lookup table: word → vector (d="+D+")",icon:"emb",iconTxt:"E",tag:"embed",kind:"embed",stage:"embedding"},
+    {id:"pos",title:"+ Positional Encoding",sub:"sinusoidal, added so order matters",icon:"pos",iconTxt:"P",tag:"add",kind:"pos",stage:"positional"},
+  ];
+  seq.forEach(o=>{root.appendChild(conn());root.appendChild(mkBlock(o));});
+
+  // layers
+  for(let l=0;l<M.cfg.layers;l++){
+    root.appendChild(conn());
+    const box=h("div","layerbox");box.appendChild(h("div","ll","Transformer layer "+(l+1)));
+    const inner=h("div","arch");
+    const comps=[
+      {id:"mha"+l,title:"Multi-Head Attention",sub:M.heads+" heads · scaled dot-product",icon:"att",iconTxt:"A",tag:"self-attn",kind:"mha",layer:l,stage:"attn"+l},
+      {id:"an1_"+l,title:"Add & Norm",sub:"residual + LayerNorm",icon:"norm",iconTxt:"N",tag:"add&norm",kind:"addnorm",layer:l,stage:"an1_"+l,which:1},
+      {id:"ffn"+l,title:"Feed Forward",sub:"Linear → ReLU → Linear (d_ff="+DFF+")",icon:"ffn",iconTxt:"F",tag:"MLP",kind:"ffn",layer:l,stage:"ffn"+l},
+      {id:"an2_"+l,title:"Add & Norm",sub:"residual + LayerNorm",icon:"norm",iconTxt:"N",tag:"add&norm",kind:"addnorm",layer:l,stage:"an2_"+l,which:2},
+    ];
+    comps.forEach((o,i)=>{if(i)inner.appendChild(conn());inner.appendChild(mkBlock(o));});
+    box.appendChild(inner);root.appendChild(box);
+  }
+
+  root.appendChild(conn());
+  root.appendChild(mkBlock({id:"out",title:"Output Representation",sub:"contextualised vectors → next layer / LM head",
+    icon:"io",iconTxt:"out",tag:"result",kind:"output",stage:"output"}));
+}
+function syncTokRow(){
+  const row=$("tokrow");row.replaceChildren();
+  MODEL.toks.forEach((tk,i)=>{const p=h("div","tokpill"+(i===SELTOK?" sel":""));
+    p.appendChild(document.createTextNode(tk));p.appendChild(h("span","ix","#"+i));
+    p.addEventListener("click",()=>{SELTOK=i;syncTokRow();refreshAll();});row.appendChild(p);});
+}
+
+/* =======================================================================
+   INSPECTOR — context aware per component kind
+   ======================================================================= */
+let ATT_TAB="flow", ATT_HEAD=0;
+function selectComponent(o){ CUR_COMP=o; renderInspector(); }
+let CUR_COMP=null;
+function refreshAll(){ renderArch(); renderInspector(); }
+
+function renderInspector(){
+  const M=MODEL, o=CUR_COMP;
+  const body=$("inspBody"); body.replaceChildren();
+  if(!o){body.appendChild(h("div","empty","Click a component on the left to open it."));return;}
+  $("inspTitle").textContent=o.title;
+  $("inspSub").textContent = o.layer!=null?("layer "+(o.layer+1)):"";
+  const tok=M.toks[SELTOK];
+
+  const descBox=(txt)=>{const d=h("div","desc",txt);body.appendChild(d);};
+  const formula=(txt)=>{const f=h("div","formula",txt);body.appendChild(f);};
+  const vpair=(label,vec,cls)=>{const kv=h("div","kv");kv.appendChild(h("div","veclabel",label));
+    kv.appendChild(vecBars(vec,cls));body.appendChild(kv);};
+
+  if(o.kind==="tokens"){
+    descBox("The sentence is split into tokens (here, by spaces). Each token is just an index into the "+
+      "embedding table — it has no meaning yet. Selected token: “"+tok+"” (#"+SELTOK+").");
+    formula("tokens = split(sentence)\nn = "+M.n+" tokens, model width d = "+D);
+    body.appendChild(evolutionPanel());
+    return;
+  }
+  if(o.kind==="embed"){
+    descBox("Each token id is looked up in a learned embedding table, producing a d="+D+" vector. "+
+      "Identical words get identical embeddings — notice both “the” tokens start the same.");
+    formula("embed(“"+tok+"”)  ∈ ℝ^"+D);
+    vpair("embedding",M.SNAP.embedding.vectors[SELTOK],"n");
+    body.appendChild(evolutionPanel());
+    return;
+  }
+  if(o.kind==="pos"){
+    descBox("A sinusoidal positional encoding (unique per position) is added to the embedding so the model "+
+      "knows word order. This is the input to the first layer.");
+    formula("x = embed(“"+tok+"”) + PE(pos="+SELTOK+")");
+    vpair("embedding",M.SNAP.embedding.vectors[SELTOK],"n");
+    vpair("+ position",M.pe[SELTOK],"k");
+    vpair("= input x",M.SNAP.positional.vectors[SELTOK],"q");
+    body.appendChild(evolutionPanel());
+    return;
+  }
+  if(o.kind==="mha"){ renderMHA(o.layer); return; }
+  if(o.kind==="addnorm"){
+    const L=M.LAYERS[o.layer]; const which=o.which;
+    const inp = which===1 ? M.SNAP.positional /*display*/ : null;
+    descBox("Add & Norm = a residual connection followed by LayerNorm. The sublayer's output is ADDED to its "+
+      "input (so information is never lost), then normalised to zero-mean / unit-variance for stable training.");
+    formula("out = LayerNorm( x + Sublayer(x) )");
+    const before = which===1 ? (o.layer===0?M.SNAP.positional.vectors[SELTOK]:M.LAYERS[o.layer-1].h2[SELTOK]) : L.h1[SELTOK];
+    const sub    = which===1 ? L.attnOut[SELTOK] : L.ff[SELTOK];
+    const sum    = which===1 ? L.res1[SELTOK] : L.res2[SELTOK];
+    const normed = which===1 ? L.h1[SELTOK] : L.h2[SELTOK];
+    vpair("x (residual in)",before,"q");
+    vpair(which===1?"+ attention out":"+ FFN out",sub,"v");
+    vpair("= sum",sum,"k");
+    vpair("→ LayerNorm",normed,"n");
+    body.appendChild(evolutionPanel());
+    return;
+  }
+  if(o.kind==="ffn"){
+    const L=M.LAYERS[o.layer];
+    descBox("A position-wise feed-forward network: the same 2-layer MLP is applied to every token independently. "+
+      "It expands to d_ff="+DFF+" with ReLU, then projects back to d="+D+". This is where much of the model's "+
+      "'thinking' capacity lives.");
+    formula("FFN(x) = ReLU( x·W₁ + b₁ )·W₂ + b₂\n"+
+            "  d="+D+"  →  d_ff="+DFF+"  →  d="+D);
+    vpair("input h",L.h1[SELTOK],"q");
+    vpair("FFN output",L.ff[SELTOK],"v");
+    body.appendChild(evolutionPanel());
+    return;
+  }
+  if(o.kind==="output"){
+    descBox("After "+M.cfg.layers+" layer(s), each token is now a context-aware vector — it has absorbed "+
+      "information from the tokens it attended to. In a full model this feeds the next layer or a final "+
+      "linear + softmax head that predicts the next token.");
+    vpair("final vector",M.SNAP.output.vectors[SELTOK],"n");
+    body.appendChild(evolutionPanel());
+    return;
+  }
+}
+
+/* ---- value-evolution heatmap (how the token changes at every step) ---- */
+function evolutionPanel(){
+  const M=MODEL;const wrap=h("div");wrap.style.marginTop="14px";
+  wrap.appendChild(h("div","card-title")).appendChild(h("h2",null,"“"+M.toks[SELTOK]+"” through the network"));
+  const hint=h("div","hint");hint.textContent="Each row = the token's "+D+"-dim vector at that stage. Colour = value (blue − / pink +). Watch it change.";
+  wrap.appendChild(hint);
+  const evo=h("div","evo");evo.style.marginTop="8px";
+  const tbl=h("table","evo-t");
+  const thead=h("thead");const hr=h("tr");hr.appendChild(h("th",null,"stage"));
+  for(let d=0;d<D;d++)hr.appendChild(h("th",null,"d"+d));thead.appendChild(hr);tbl.appendChild(thead);
+  const tb=h("tbody");
+  M.stageOrder.forEach(key=>{
+    const s=M.SNAP[key];if(!s)return;const vec=s.vectors[SELTOK];
+    const tr=h("tr");if(CUR_COMP&&CUR_COMP.stage===key)tr.className="stagesel";
+    tr.appendChild(h("th",null,s.label));
+    const max=Math.max(0.001,...vec.map(v=>Math.abs(v)));
+    vec.forEach(v=>{const td=h("td",null,v.toFixed(1));td.style.background=divColor(v,max*1.1);
+      td.title=v.toFixed(4);tr.appendChild(td);});
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);evo.appendChild(tbl);wrap.appendChild(evo);
+  return wrap;
+}
+
+/* =======================================================================
+   MULTI-HEAD ATTENTION detail (Q/K/V, flow, matrix, softmax)
+   ======================================================================= */
+function renderMHA(layer){
+  const M=MODEL, body=$("inspBody"), L=M.LAYERS[layer];
+  ATT_HEAD=Math.min(ATT_HEAD,M.heads-1);
+  const d=h("div","desc");
+  d.textContent="Multi-head self-attention. Each token forms a Query, and compares it (dot product) against every "+
+    "token's Key. The scaled, softmaxed scores weight each token's Value; the results from all "+M.heads+
+    " heads are concatenated and projected. Select a head and a token below.";
+  body.appendChild(d);
+  body.appendChild(h("div","formula","Attention(Q,K,V) = softmax( Q·Kᵀ / √d_k ) · V     (d_k = "+L.dHead+")"));
+
+  // head selector
+  const heads=h("div","tabs");
+  for(let hh=0;hh<M.heads;hh++){const b=h("button",ATT_HEAD===hh?"on":"","Head "+(hh+1));
+    b.addEventListener("click",()=>{ATT_HEAD=hh;renderMHA(layer);});heads.appendChild(b);}
+  body.appendChild(heads);
+
+  // view tabs
+  const tabs=h("div","tabs");
+  [["flow","Flow"],["matrix","Matrix"],["qkv","Q·K·V of “"+M.toks[SELTOK]+"”"],["soft","Softmax"]].forEach(([id,lab])=>{
+    const b=h("button",ATT_TAB===id?"on":"",lab);b.addEventListener("click",()=>{ATT_TAB=id;renderMHA(layer);});tabs.appendChild(b);});
+  body.appendChild(tabs);
+
+  const ph=L.perHead[ATT_HEAD];
+  if(ATT_TAB==="flow")   body.appendChild(flowSVG(ph));
+  if(ATT_TAB==="matrix") body.appendChild(matrixEl(ph));
+  if(ATT_TAB==="qkv")    qkvView(body,ph);
+  if(ATT_TAB==="soft")   softView(body,ph);
+
+  body.appendChild(evolutionPanel());
+}
+
+function flowSVG(ph){
+  const M=MODEL,n=M.n;
+  const W=520,rowH=Math.max(26,Math.min(40,240/n)),padTop=30,boxW=150,boxH=rowH-7,H=padTop+n*rowH+14;
+  const svg=svgel("svg",{class:"flow",viewBox:`0 0 ${W} ${H}`,preserveAspectRatio:"xMidYMid meet"});
+  const xL=14,xR=W-14-boxW;
+  svg.appendChild(svgel("text",{x:xL,y:20,class:"colcap"},"Query"));
+  svg.appendChild(svgel("text",{x:xR,y:20,class:"colcap"},"Key / Value"));
+  const wt=ph.weights;
+  const g=svgel("g");svg.appendChild(g);
+  wt[SELTOK].forEach((w,kj)=>{
+    if(w<0.012)return;const yq=padTop+SELTOK*rowH+boxH/2,yk=padTop+kj*rowH+boxH/2;
+    const x1=xL+boxW,x2=xR,mx=(x1+x2)/2;const dd=`M ${x1} ${yq} C ${mx} ${yq}, ${mx} ${yk}, ${x2} ${yk}`;
+    const p=svgel("path",{d:dd,class:"edge anim"});p.style.stroke="var(--accent2)";
+    p.style.strokeWidth=(1+w*7).toFixed(2);p.style.strokeOpacity=(0.15+w*0.85).toFixed(2);g.appendChild(p);
+    if(w>0.16){const c=svgel("circle",{r:3.2,class:"pulse"});
+      c.appendChild(svgel("animateMotion",{dur:(1.7-w).toFixed(2)+"s",repeatCount:"indefinite",path:dd,rotate:"auto"}));g.appendChild(c);}
+  });
+  const col=(x,side)=>{for(let i=0;i<n;i++){const y=padTop+i*rowH;
+    const gg=svgel("g",{class:"tok"+(i===SELTOK&&side==="q"?" sel":"")});
+    gg.appendChild(svgel("rect",{x,y,width:boxW,height:boxH,rx:8}));
+    gg.appendChild(svgel("text",{x:x+11,y:y+boxH/2+4},M.toks[i]));
+    gg.appendChild(svgel("text",{x:x+boxW-9,y:y+boxH/2+4,"text-anchor":"end",
+      style:"fill:var(--muted);font-size:9px;font-family:var(--mono)"},"#"+i));
+    gg.addEventListener("click",()=>{SELTOK=i;syncTokRow();refreshAll();});
+    svg.appendChild(gg);}};
+  col(xL,"q");col(xR,"k");
+  const wrap=h("div");wrap.appendChild(svg);
+  const lg=h("div","legend");lg.appendChild(h("span",null,"edge = how much “"+M.toks[SELTOK]+"” attends to that token"));
+  wrap.appendChild(lg);return wrap;
+}
+
+function matrixEl(ph){
+  const M=MODEL,n=M.n,wt=ph.weights,mk=ph.masked;const wrap=h("div");wrap.style.overflow="auto";
+  const tbl=h("table","matrix");const hr=h("tr");hr.appendChild(h("th",null,""));
+  for(let j=0;j<n;j++)hr.appendChild(h("th",null,M.toks[j]));tbl.appendChild(hr);
+  for(let i=0;i<n;i++){const tr=h("tr");const th=h("th",null,M.toks[i]);th.style.textAlign="right";tr.appendChild(th);
+    for(let j=0;j<n;j++){const w=wt[i][j];const td=h("td");
+      if(mk[i][j]===-Infinity){td.style.background="#0a1130";td.textContent="·";td.style.color="var(--line)";}
+      else{td.style.background=heatColor(w);td.textContent=w<0.005?"":w.toFixed(2).slice(1);}
+      td.title="q“"+M.toks[i]+"” · k“"+M.toks[j]+"” → "+w.toFixed(3);
+      td.addEventListener("click",()=>{SELTOK=i;syncTokRow();refreshAll();});
+      tr.appendChild(td);}
+    tbl.appendChild(tr);}
+  wrap.appendChild(tbl);
+  const lg=h("div","legend");lg.appendChild(h("span",null,"rows = query · cols = key · brighter = higher weight"));
+  wrap.appendChild(lg);return wrap;
+}
+
+function qkvView(body,ph){
+  const M=MODEL;
+  const kv=(label,vec,cls)=>{const w=h("div","kv");w.appendChild(h("div","veclabel",label));
+    w.appendChild(vecBars(vec,cls));body.appendChild(w);};
+  const info=h("div","hint");info.style.margin="4px 0 6px";
+  info.textContent="For token “"+M.toks[SELTOK]+"”, this head's slice (dims "+ph.lo+"–"+(ph.hi-1)+") of Q, K, V:";
+  body.appendChild(info);
+  kv("Q — what I seek",ph.Q[SELTOK],"q");
+  kv("K — what I offer",ph.K[SELTOK],"k");
+  kv("V — what I pass on",ph.V[SELTOK],"v");
+  const f=h("div","formula");
+  let best=0,bi=0;ph.weights[SELTOK].forEach((w,j)=>{if(w>best){best=w;bi=j;}});
+  f.textContent="strongest match: q(“"+M.toks[SELTOK]+"”)·k(“"+M.toks[bi]+"”)/√"+ph.dHead+
+    " = "+ph.scores[SELTOK][bi].toFixed(2)+"  → weight "+best.toFixed(2);
+  body.appendChild(f);
+}
+
+function softView(body,ph){
+  const M=MODEL;const w=ph.weights[SELTOK];
+  const info=h("div","hint");info.style.margin="4px 0 8px";
+  info.textContent="Softmax over row “"+M.toks[SELTOK]+"” (temp "+M.cfg.temp.toFixed(1)+") — sums to 1:";
+  body.appendChild(info);
+  w.forEach((val,j)=>{const r=h("div","softrow");r.appendChild(h("div","tk",M.toks[j]));
+    const bw=h("div");const bar=h("div","softbar");bar.style.width="0%";bw.appendChild(bar);r.appendChild(bw);
+    r.appendChild(h("div","softval",val.toFixed(3)));body.appendChild(r);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.width=(val*100)+"%";}));});
+}
+
+/* =======================================================================
+   WIRING
+   ======================================================================= */
+function readCfg(){return{sentence:$("sentence").value||"the cat sat",atype:$("atype").value,
+  layers:parseInt($("layers").value,10),heads:parseInt($("heads").value,10),
+  win:parseInt($("win").value,10),temp:parseFloat($("temp").value)};}
+
+function run(){
+  MODEL=forward(readCfg());
+  SELTOK=Math.min(SELTOK,MODEL.n-1);
+  ATT_HEAD=Math.min(ATT_HEAD,MODEL.heads-1);
+  SELBLOCK="mha0"; CUR_COMP={id:"mha0",title:"Multi-Head Attention",kind:"mha",layer:0,stage:"attn0"};
+  syncTokRow();renderArch();renderInspector();
+}
+
+$("run").addEventListener("click",run);
+$("sentence").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+["layers","heads","atype"].forEach(id=>$(id).addEventListener("change",()=>{
+  $("win").disabled=$("atype").value!=="window";run();}));
+$("win").addEventListener("input",()=>{$("winval").textContent=$("win").value;if($("atype").value==="window")run();});
+$("temp").addEventListener("input",()=>{$("tempval").textContent=parseFloat($("temp").value).toFixed(1);run();});
+document.querySelectorAll(".chip[data-ex]").forEach(c=>c.addEventListener("click",()=>{$("sentence").value=c.getAttribute("data-ex");run();}));
+$("animBtn").addEventListener("click",()=>{document.body.classList.toggle("flowing");
+  $("animBtn").textContent=document.body.classList.contains("flowing")?"⏸ Stop flow":"✦ Animate flow";});
+
+$("win").disabled=true;
+run();
+</script>
+</body>
+</html>
